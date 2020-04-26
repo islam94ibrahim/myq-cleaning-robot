@@ -21,6 +21,73 @@ class CleaningRobotCommandTest extends TestCase
         return require __DIR__ . '/../bootstrap.php';
     }
 
+    public function testInvalidSourceFilePath()
+    {
+        $commandTester = new CommandTester($this->command);
+        $commandTester->execute([
+            'source' => __DIR__ . '/wrong_file.json',
+            'result' => __DIR__ . '/result.json'
+        ]);
+
+        $output = $commandTester->getDisplay();
+        $this->assertEquals('Source path is not valid!', trim($output));
+    }
+
+    public function testInvalidResultFilePath()
+    {
+        $commandTester = new CommandTester($this->command);
+        $commandTester->execute([
+            'source' => __DIR__ . '/../Files/test_no_start_path.json',
+            'result' => __DIR__ . '/wrong_directory/result.json'
+        ]);
+
+        $output = $commandTester->getDisplay();
+        $this->assertEquals('Result path is not valid!', trim($output));
+    }
+
+    public function testNoPathFromStart()
+    {
+        $commandTester = new CommandTester($this->command);
+        $commandTester->execute([
+            'source' => __DIR__ . '/../Files/test_no_start_path.json',
+            'result' => __DIR__ . '/result.json'
+        ]);
+
+        $output = $commandTester->getDisplay();
+        $this->assertEquals('Source file content is not valid!', trim($output));
+    }
+
+    public function testOutOfBattery()
+    {
+        $commandTester = new CommandTester($this->command);
+        $commandTester->execute([
+            'source' => __DIR__ . '/../Files/test_out_of_battery.json',
+            'result' => __DIR__ . '/../Files/result.json'
+        ]);
+
+        $output = $commandTester->getDisplay();
+        $this->assertStringContainsString('Battery fully consumed', $output);
+
+        unlink(__DIR__ . '/../Files/result.json');
+    }
+
+    public function testAllBackOffSequencesTriggered()
+    {
+        $commandTester = new CommandTester($this->command);
+        $commandTester->execute([
+            'source' => __DIR__ . '/../Files/test_stuck.json',
+            'result' => __DIR__ . '/../Files/result.json'
+        ]);
+
+        $output = $commandTester->getDisplay();
+        $this->assertStringContainsString('["TR","A","TL"]', $output);
+        $this->assertStringContainsString('["TR","A","TR"]', $output);
+        $this->assertStringContainsString('["TR","B","TR","A"]', $output);
+        $this->assertStringContainsString('["TL","TL","A"]', $output);
+
+        unlink(__DIR__ . '/../Files/result.json');
+    }
+
     public function testCommandReturnExpectedOutputForTestFileOne()
     {
         $commandTester = new CommandTester($this->command);
