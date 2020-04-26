@@ -1,0 +1,15 @@
+#!/usr/bin/env php
+<?php
+
+require_once __DIR__ . '/vendor/autoload.php';
+
+use App\Validator\CleaningBotValidator;
+use Symfony\Component\Console\Application;
+use App\Command\CleaningRobotCommand;
+
+$application = new Application('cleaningBot', '1.0.0');
+
+$application->add(new CleaningRobotCommand(new CleaningBotValidator()));
+$application->run();
+
+return $application;
