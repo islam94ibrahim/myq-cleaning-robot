@@ -155,7 +155,9 @@ class CleaningRobotCommand extends Command
 
                 if (in_array($this->map[$newPositionY][$newPositionX], ['C', 'null'])) {
                     // if current position is an obstacle, initiate back off strategy
-                    // TODO: implement back off strategy
+                    [$abort, $result] = $this->backOff($result, $output);
+
+                    if ($abort) break;
                 } else {
                     // assign new positions
                     $this->positionX = $newPositionX;
@@ -180,7 +182,9 @@ class CleaningRobotCommand extends Command
 
                 if (in_array($this->map[$this->positionY][$this->positionX], ['C', 'null', ''])) {
                     // if current position is an obstacle or already cleaned, initiate back off strategy
-                    // TODO: implement back off strategy
+                    [$abort, $result] = $this->backOff($result, $output);
+
+                    if ($abort) break;
                 } else {
                     $this->map[$this->positionY][$this->positionX] = '';
                     $result['cleaned'][] = (object)[
@@ -272,5 +276,79 @@ class CleaningRobotCommand extends Command
         }
 
         return false;
+    }
+
+    /**
+     * Initiate back off strategies until the robot is not stuck
+     *
+     * @param $result
+     * @param $output
+     * @param int $index
+     * @param mixed $strategy
+     * @return array
+     */
+    private function backOff($result, $output, $index = 0, $strategy = self::BACK_OFF_STRATEGIES[0])
+    {
+        $output->writeln(sprintf('- Back off %s strategy initiated.', json_encode($strategy)));
+
+        foreach ($strategy as $command) {
+            // if no more battery left, abort and return result
+            if ($this->battery - self::BATTERY_CONSUMPTION[$command] < 0) {
+                $output->writeln('- Battery fully consumed, aborting.');
+                return [
+                    true, // boolean used to know if the robot should abort during back off strategy
+                    $result
+                ];
+            }
+
+            // deduct battery
+            $this->battery -= self::BATTERY_CONSUMPTION[$command];
+
+            if (in_array($command, ['TR', 'TL'])) {
+                // direction change
+                $this->direction = $this->changeDirection($command);
+                $output->writeln(sprintf(
+                    '- Performing command %s (new direction is %s).',
+                    $command,
+                    $this->direction
+                ));
+            } elseif (in_array($command, ['A', 'B'])) {
+                // position change
+                [$newPositionX, $newPositionY] = $this->move($command);
+                $output->writeln(sprintf(
+                    '- Performing command %s (Moving to point (%d,%d)).',
+                    $command,
+                    $newPositionX,
+                    $newPositionY
+                ));
+
+                // if current position is an obstacle, ignore rest of the sequence
+                if (in_array($this->map[$newPositionY][$newPositionX], ['C', 'null'])) {
+                    $index++;
+                    // if we don't go through all back off strategies, recursively try next one, otherwise abort
+                    return $index > count(self::BACK_OFF_STRATEGIES) - 1 ?
+                        [false, $result] :
+                        $this->backOff($result, $output, $index, self::BACK_OFF_STRATEGIES[$index]);
+                }
+
+                // assign new positions
+                $this->positionX = $newPositionX;
+                $this->positionY = $newPositionY;
+
+                // check if current point is not already visited before
+                if (!$this->isVisited()) {
+                    $result['visited'][] = (object)[
+                        'X' => $this->positionX,
+                        'Y' => $this->positionY
+                    ];
+                    $this->visited[] = [$this->positionX, $this->positionY];
+                }
+            }
+        }
+
+        return [
+            false, // back off strategy performed successfully, robot continues next commands
+            $result
+        ];
     }
 }
