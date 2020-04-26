@@ -61,6 +61,13 @@ class CleaningRobotCommand extends Command
      */
     private $visited = [];
 
+    public function __construct(CleaningBotValidator $validator, String $name = null)
+    {
+        parent::__construct($name);
+
+        $this->validator = $validator;
+    }
+
     /**
      * Configure command name and required inputs
      */
@@ -104,7 +111,11 @@ class CleaningRobotCommand extends Command
 
         $content = json_decode(file_get_contents($sourcePath), true);
 
-        // TODO: validate content
+        // validate source file structure
+        if (!$this->validator->isValid($content)) {
+            $output->writeln('Source file content is not valid!');
+            return 0;
+        };
 
         $this->map = $content['map'];
         $this->battery = $content['battery'];
